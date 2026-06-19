@@ -2,17 +2,24 @@
   "package": "@przeprogramowani/10x-cli",
   "version": "1.6.1",
   "manifestVersion": 2,
-  "lastApplied": "2026-06-19T20:00:55.373Z",
-  "lessonId": "m4l5",
+  "lastApplied": "2026-06-19T20:01:14.687Z",
+  "lessonId": "m5l1",
   "course": "10xdevs3",
   "tool": "claude-code",
   "files": {
-    "skills": {},
-    "prompts": [
-      "m4l5-1-domain-distillation.md",
-      "m4l5-2-invariant-aggregate-refactor.md",
-      "m4l5-3-anti-corruption-layer.md"
-    ],
+    "skills": {
+      "10x-opportunity-map": {
+        "files": [
+          "SKILL.md"
+        ]
+      },
+      "10x-mom-test": {
+        "files": [
+          "SKILL.md"
+        ]
+      }
+    },
+    "prompts": [],
     "configs": []
   }
 }
