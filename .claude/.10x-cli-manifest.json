@@ -1,0 +1,17 @@
+{
+  "package": "@przeprogramowani/10x-cli",
+  "version": "1.6.1",
+  "manifestVersion": 2,
+  "lastApplied": "2026-06-18T22:19:21.431Z",
+  "lessonId": "m4l3",
+  "course": "10xdevs3",
+  "tool": "claude-code",
+  "files": {
+    "skills": {},
+    "prompts": [
+      "m4l3-1-research-with-map.md",
+      "m4l3-2-ast-grep-verification.md"
+    ],
+    "configs": []
+  }
+}
