@@ -1,4 +1,42 @@
-## [Unreleased] - 2026-06-14
+## [Unreleased] - 2026-06-19
+
+### Added
+- [#2465](https://github.com/flow-php/flow/pull/2465) - **flow-php/symfony-telemetry-bundle - console log output aligned with CLI verbosity (-v/-vv/-vvv), off by default.** - [@norberttech](https://github.com/norberttech)
+- [#2465](https://github.com/flow-php/flow/pull/2465) - **flow-php/symfony-telemetry-bundle - opt-in logger_provider.console_output config with overridable verbosity_levels.** - [@norberttech](https://github.com/norberttech)
+- [#2462](https://github.com/flow-php/flow/pull/2462) - **flow-php/symfony-telemetry-bundle - messenger propagation_style option (continue/link) with new MessengerTracePropagation enum** - [@norberttech](https://github.com/norberttech)
+- [#2459](https://github.com/flow-php/flow/pull/2459) - **Flow\ETL\Schema::sort() accepting a pluggable SortingStrategy (defaults to AlphabeticalStrategy)** - [@MrHDOLEK](https://github.com/MrHDOLEK)
+- [#2459](https://github.com/flow-php/flow/pull/2459) - **Core sorting strategies AlphabeticalStrategy, TypeStrategy, MetadataStrategy and CombinedStrategy, exposed via
+sort_by_name(), sort_by_type(), sort_by_type_and_name() and sort_by_metadata() DSL helpers** - [@MrHDOLEK](https://github.com/MrHDOLEK)
+- [#2459](https://github.com/flow-php/flow/pull/2459) - **PostgreSqlSortingStrategy (primary-key columns first, then by PostgreSQL type, then by name) exposed via the pgsql_sort_strategy() DSL helper** - [@MrHDOLEK](https://github.com/MrHDOLEK)
+- [#2460](https://github.com/flow-php/flow/pull/2460) - **flow-php/symfony-telemetry-bundle - inject trace context into outgoing response headers** - [@norberttech](https://github.com/norberttech)
+- [#2458](https://github.com/flow-php/flow/pull/2458) - **flow-php/symfony-telemetry-bundle - cleanup subscriber completing Twig spans orphaned by a render exception on terminate/kernel.reset** - [@norberttech](https://github.com/norberttech)
+- [#2408](https://github.com/flow-php/flow/pull/2408) - **SEAL adapter (flow-php/etl-adapter-seal) — a single, strongly typed integration for SEAL search engines (Elasticsearch, OpenSearch, Meilisearch, Algolia, Solr,
+Typesense, RediSearch, Loupe)** - [@MrHDOLEK](https://github.com/MrHDOLEK)
+- [#2408](https://github.com/flow-php/flow/pull/2408) - **from_seal() extractor and to_seal() loader, working with any SEAL EngineInterface** - [@MrHDOLEK](https://github.com/MrHDOLEK)
+- [#2408](https://github.com/flow-php/flow/pull/2408) - **to_seal_schema() and seal_schema_to_flow() DSL — recursive, bi-directional Flow Schema ↔ SEAL Schema conversion (nested structures, lists and
+maps)** - [@MrHDOLEK](https://github.com/MrHDOLEK)
+- [#2408](https://github.com/flow-php/flow/pull/2408) - **seal_create_index(), seal_drop_index(), seal_create_schema() and seal_drop_schema() DSL index-lifecycle helpers** - [@MrHDOLEK](https://github.com/MrHDOLEK)
+- [#2457](https://github.com/flow-php/flow/pull/2457) - **flow-php/symfony-filesystem-bundle - inject individual mounted filesystems via named-argument aliases** - [@norberttech](https://github.com/norberttech)
+- [#2457](https://github.com/flow-php/flow/pull/2457) - **flow-php/symfony-filesystem-bundle - #[AsFilesystem] attribute to select a mount to inject** - [@norberttech](https://github.com/norberttech)
+- [#2454](https://github.com/flow-php/flow/pull/2454) - **Positional schema definition mutations on Flow\ETL\Schema: prepend(), insertAt(), addBefore(), addAfter(), moveTo(), moveBefore(), moveAfter() and reorder()** - [@bendavies](https://github.com/bendavies)
+
+### Changed
+- [#2464](https://github.com/flow-php/flow/pull/2464) - **flow-php/symfony-telemetry-bundle - messenger span name now follows OTEL {operation} {message} convention** - [@norberttech](https://github.com/norberttech)
+- [#2464](https://github.com/flow-php/flow/pull/2464) - **flow-php/symfony-telemetry-bundle - messaging.operation.name now holds the operation verb, destination is the message class, bus moved to messaging.symfony.bus** - [@norberttech](https://github.com/norberttech)
+- [#2462](https://github.com/flow-php/flow/pull/2462) - **flow-php/symfony-telemetry-bundle - consumer span now defaults to a linked trace instead of continuing the producer trace** - [@norberttech](https://github.com/norberttech)
+- [#2460](https://github.com/flow-php/flow/pull/2460) - **flow-php/symfony-telemetry-bundle - flow-php/symfony-http-foundation-telemetry-bridge is now an optional dependency; context propagation is silently disabled when absent** - [@norberttech](https://github.com/norberttech)
+- [#2457](https://github.com/flow-php/flow/pull/2457) - **flow-php/filesystem - rename FilesystemTable::for() parameter $protocol to $mount** - [@norberttech](https://github.com/norberttech)
+
+### Fixed
+- [#2460](https://github.com/flow-php/flow/pull/2460) - **flow-php/symfony-telemetry-bundle - metric attributes render as a toggleable table row in the profiler panel** - [@norberttech](https://github.com/norberttech)
+- [#2458](https://github.com/flow-php/flow/pull/2458) - **flow-php/symfony-telemetry-bundle - successful Twig spans now report OK status** - [@norberttech](https://github.com/norberttech)
+- [dd2562](https://github.com/flow-php/flow/commit/dd2562286e0c069f480cd8763915930abf95d32b) - **arrow-rs extension github workflow** - [@norberttech](https://github.com/norberttech)
+
+### Removed
+- [#2408](https://github.com/flow-php/flow/pull/2408) - **Elasticsearch adapter (flow-php/etl-adapter-elasticsearch) — superseded by the SEAL adapter; use SEAL with the Elasticsearch backend
+(cmsig/seal-elasticsearch-adapter)** - [@MrHDOLEK](https://github.com/MrHDOLEK)
+
+## [0.40.0] - 2026-06-16
 
 ### Added
 - [#2448](https://github.com/flow-php/flow/pull/2448) - **flow-php/symfony-telemetry-bundle - Web Profiler panel with spans, metrics and logs.** - [@norberttech](https://github.com/norberttech)
@@ -23,6 +61,8 @@
 - [#2434](https://github.com/flow-php/flow/pull/2434) - **flow-php/symfony-telemetry-bundle - per-channel binding of PSR-3 LoggerInterface and native Logger with $Logger aliases** - [@norberttech](https://github.com/norberttech)
 
 ### Changed
+- [8df0b5](https://github.com/flow-php/flow/commit/8df0b541a8a9879a79c2f886cde3d0119265544a) - **chore: update project dependencies** - [@norberttech](https://github.com/norberttech)
+- [#2450](https://github.com/flow-php/flow/pull/2450) - **Fallback to the Symfony XML configuration only at `^6.4.0`** - [@stloyd](https://github.com/stloyd)
 - [#2449](https://github.com/flow-php/flow/pull/2449) - **Migrate Symfony XML configuration usage to the PHP one** - [@stloyd](https://github.com/stloyd)
 - [#2446](https://github.com/flow-php/flow/pull/2446) - **flow-php/postgresql - column and domain defaults are modeled as ColumnDefault (breaking ColumnShape/DomainShape default shape)** - [@norberttech](https://github.com/norberttech)
 - [#2441](https://github.com/flow-php/flow/pull/2441) - **flow-php/telemetry - OTEL_RESOURCE_ATTRIBUTES now percent-decodes keys and values per OTel spec** - [@norberttech](https://github.com/norberttech)
@@ -38,6 +78,7 @@
 - [460061](https://github.com/flow-php/flow/commit/46006120b9fbebbb5c84b4cf0c0dd9032285cef1) - **fix(flow-php/arrow-ext): macOS arm64 release binary build** - [@norberttech](https://github.com/norberttech)
 
 ### Fixed
+- [#2452](https://github.com/flow-php/flow/pull/2452) - **flow-php/postgresql - BulkInsert upsert with an empty update set now emits ON CONFLICT DO NOTHING instead of a plain INSERT.** - [@norberttech](https://github.com/norberttech)
 - [#2447](https://github.com/flow-php/flow/pull/2447) - **collect coverage only from php8.3 tests** - [@norberttech](https://github.com/norberttech)
 - [#2446](https://github.com/flow-php/flow/pull/2446) - **flow-php/postgresql - schema diff now detects stale-cast drift in column and domain defaults** - [@norberttech](https://github.com/norberttech)
 - [#2444](https://github.com/flow-php/flow/pull/2444) - **flow-php/telemetry-otlp-bridge - isolate grpc tests so the PHP 8.5 shutdown SIGSEGV (grpc#38216) no longer fails CI** - [@norberttech](https://github.com/norberttech)

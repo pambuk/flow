@@ -16,6 +16,10 @@ use Flow\Bridge\Symfony\TelemetryBundle\DependencyInjection\Compiler\OTLPAvailab
 use Flow\Bridge\Symfony\TelemetryBundle\DependencyInjection\Compiler\ProfilerSignalCapturePass;
 use Flow\Bridge\Symfony\TelemetryBundle\DependencyInjection\Compiler\Psr18ClientTelemetryPass;
 use Flow\Bridge\Symfony\TelemetryBundle\Exception\RuntimeException;
+use Flow\Bridge\Symfony\TelemetryBundle\Instrumentation\Console\ConsoleLogOutputSubscriber;
+use Flow\Bridge\Symfony\TelemetryBundle\Instrumentation\Messenger\MessengerTracePropagation;
+use Flow\Bridge\Symfony\TelemetryBundle\Logger\ConsoleOutputLogProcessor;
+use Flow\Bridge\Symfony\TelemetryBundle\Logger\ConsoleVerbosityLevels;
 use Flow\Bridge\Symfony\TelemetryBundle\Resource\Detector\SymfonyDeploymentDetector;
 use Flow\Bridge\Telemetry\OTLP\Exporter\OTLPExporter;
 use Flow\Bridge\Telemetry\OTLP\Serializer\JsonSerializer;
@@ -130,6 +134,8 @@ final class FlowTelemetryBundle extends AbstractBundle
     private const string DBAL_MIDDLEWARE_INTERFACE = 'Doctrine\\DBAL\\Driver\\Middleware';
 
     private const string HTTP_CLIENT_INTERFACE = 'Symfony\\Contracts\\HttpClient\\HttpClientInterface';
+
+    private const string HTTP_FOUNDATION_REQUEST_CARRIER = 'Flow\\Bridge\\Symfony\\HttpFoundationTelemetry\\RequestCarrier';
 
     private const string MESSENGER_MIDDLEWARE_INTERFACE = 'Symfony\\Component\\Messenger\\Middleware\\MiddlewareInterface';
 
@@ -443,6 +449,24 @@ final class FlowTelemetryBundle extends AbstractBundle
             ->info('Name of an error_handler entry forwarded to the LoggerProvider')
             ->defaultValue('default')
             ->end()
+            ->arrayNode('console_output')
+            ->info(
+                'Tee emitted log records to the running console command output, filtered by CLI verbosity (-v/-vv/-vvv). The Flow equivalent of Symfony\'s Monolog ConsoleHandler; display only, exporters are unaffected. Off by default.',
+            )
+            ->canBeEnabled()
+            ->children()
+            ->arrayNode('verbosity_levels')
+            ->info(
+                'Override the verbosity->minimum-severity thresholds. Keys: VERBOSITY_QUIET, VERBOSITY_NORMAL, VERBOSITY_VERBOSE, VERBOSITY_VERY_VERBOSE, VERBOSITY_DEBUG. Values: TRACE, DEBUG, INFO, WARN, ERROR, FATAL. Defaults: QUIET=ERROR, NORMAL=WARN, VERBOSE=INFO, VERY_VERBOSE=DEBUG, DEBUG=TRACE.',
+            )
+            ->normalizeKeys(false)
+            ->useAttributeAsKey('name')
+            ->enumPrototype()
+            ->values(['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'])
+            ->end()
+            ->end()
+            ->end()
+            ->end()
             ->append($this->processorNode('log'))
             ->end()
             ->end()
@@ -471,7 +495,7 @@ final class FlowTelemetryBundle extends AbstractBundle
             ->end()
             ->end()
             ->booleanNode('context_propagation')
-            ->info('Enable context propagation from incoming HTTP headers (requires propagator)')
+            ->info('Extract trace context from incoming request headers and inject it into outgoing response headers (requires flow-php/symfony-http-foundation-telemetry-bridge; silently disabled when absent)')
             ->defaultTrue()
             ->end()
             ->end()
@@ -494,6 +518,13 @@ final class FlowTelemetryBundle extends AbstractBundle
             ->booleanNode('context_propagation')
             ->info('Enable context propagation across message boundaries (requires propagator)')
             ->defaultTrue()
+            ->end()
+            ->enumNode('propagation_style')
+            ->info('When context propagation is enabled, how the consumer span relates to the producer span: '
+                . '"link" (default) keeps the consumer in the worker\'s own trace and links back to the producer; '
+                . '"continue" makes the consumer a child in the producer\'s trace.')
+            ->values(['continue', 'link'])
+            ->defaultValue('link')
             ->end()
             ->end()
             ->end()
@@ -705,7 +736,7 @@ final class FlowTelemetryBundle extends AbstractBundle
     }
 
     /**
-     * @param array{resource: array{detectors?: array{enabled?: bool, static?: array{cache?: array{enabled?: bool, path?: null|string}, os?: array{enabled?: bool}, host?: array{enabled?: bool}, service?: array{enabled?: bool}, deployment?: array{enabled?: bool}, environment?: array{enabled?: bool}}, dynamic?: array{process?: array{enabled?: bool}}}, custom?: array<string, mixed>}, clock_service_id?: null|string, framework_logger?: null|string, capture_framework_channels?: bool, channel_attribute_target?: 'scope'|'signal'|'both', context_storage?: array{type?: string, service_id?: null|string}, propagator?: array{type?: string, service_id?: null|string}, exporters?: array<string, array<string, mixed>>, error_handlers?: array<string, array<string, mixed>>, tracer_provider?: array<string, mixed>, meter_provider?: array<string, mixed>, logger_provider?: array<string, mixed>, instrumentation?: array{http_kernel?: array{enabled?: bool, exclude_paths?: array<array{path: string, method?: null|string}>, context_propagation?: bool}, console?: array{enabled?: bool, exclude_commands?: array<string>}, messenger?: array{enabled?: bool, context_propagation?: bool}, twig?: array{enabled?: bool, trace_templates?: bool, trace_blocks?: bool, trace_macros?: bool, exclude_templates?: array<string>}, http_client?: array{enabled?: bool, exclude_clients?: array<string>}, psr18_client?: array{enabled?: bool, exclude_clients?: array<string>}, dbal?: array{enabled?: bool, log_sql?: bool, max_sql_length?: int, exclude_connections?: array<string>}, cache?: array{enabled?: bool, exclude_pools?: array<string>}}, profiler?: array{enabled?: bool|null, capture_logs?: bool}, tracers?: array<string, array{version?: string, schema_url?: null|string, attributes?: array{scope?: array<string, mixed>, signal?: array<string, mixed>}}>, meters?: array<string, array{version?: string, schema_url?: null|string, attributes?: array{scope?: array<string, mixed>, signal?: array<string, mixed>}}>, loggers?: array<string, array{version?: string, schema_url?: null|string, attributes?: array{scope?: array<string, mixed>, signal?: array<string, mixed>}}>} $config
+     * @param array{resource: array{detectors?: array{enabled?: bool, static?: array{cache?: array{enabled?: bool, path?: null|string}, os?: array{enabled?: bool}, host?: array{enabled?: bool}, service?: array{enabled?: bool}, deployment?: array{enabled?: bool}, environment?: array{enabled?: bool}}, dynamic?: array{process?: array{enabled?: bool}}}, custom?: array<string, mixed>}, clock_service_id?: null|string, framework_logger?: null|string, capture_framework_channels?: bool, channel_attribute_target?: 'scope'|'signal'|'both', context_storage?: array{type?: string, service_id?: null|string}, propagator?: array{type?: string, service_id?: null|string}, exporters?: array<string, array<string, mixed>>, error_handlers?: array<string, array<string, mixed>>, tracer_provider?: array<string, mixed>, meter_provider?: array<string, mixed>, logger_provider?: array<string, mixed>, instrumentation?: array{http_kernel?: array{enabled?: bool, exclude_paths?: array<array{path: string, method?: null|string}>, context_propagation?: bool}, console?: array{enabled?: bool, exclude_commands?: array<string>}, messenger?: array{enabled?: bool, context_propagation?: bool, propagation_style?: 'continue'|'link'}, twig?: array{enabled?: bool, trace_templates?: bool, trace_blocks?: bool, trace_macros?: bool, exclude_templates?: array<string>}, http_client?: array{enabled?: bool, exclude_clients?: array<string>}, psr18_client?: array{enabled?: bool, exclude_clients?: array<string>}, dbal?: array{enabled?: bool, log_sql?: bool, max_sql_length?: int, exclude_connections?: array<string>}, cache?: array{enabled?: bool, exclude_pools?: array<string>}}, profiler?: array{enabled?: bool|null, capture_logs?: bool}, tracers?: array<string, array{version?: string, schema_url?: null|string, attributes?: array{scope?: array<string, mixed>, signal?: array<string, mixed>}}>, meters?: array<string, array{version?: string, schema_url?: null|string, attributes?: array{scope?: array<string, mixed>, signal?: array<string, mixed>}}>, loggers?: array<string, array{version?: string, schema_url?: null|string, attributes?: array{scope?: array<string, mixed>, signal?: array<string, mixed>}}>} $config
      */
     #[Override]
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
@@ -1265,6 +1296,18 @@ final class FlowTelemetryBundle extends AbstractBundle
         $processorServiceId = $this->buildLogProcessor($processorConfig, $providerServiceId, $builder);
         $errorHandlerRef = $this->resolveErrorHandlerReference($config['error_handler'] ?? 'default', $builder);
 
+        $consoleOutputConfig = is_array($config['console_output'] ?? null) ? $config['console_output'] : [];
+
+        if ((bool) ($consoleOutputConfig['enabled'] ?? false)) {
+            $processorServiceId = $this->buildConsoleOutputLogging(
+                $consoleOutputConfig,
+                $providerServiceId,
+                $processorServiceId,
+                $errorHandlerRef,
+                $builder,
+            );
+        }
+
         $definition = new Definition(LoggerProvider::class);
         $definition->setArgument(0, new Reference($processorServiceId));
         $definition->setArgument(1, new Reference('flow.telemetry.clock'));
@@ -1273,6 +1316,46 @@ final class FlowTelemetryBundle extends AbstractBundle
         $builder->setDefinition($providerServiceId, $definition);
 
         return $providerServiceId;
+    }
+
+    /**
+     * Wraps the configured export processor in a composite that also tees records to
+     * the running console command output, and registers the supporting holder and
+     * event subscriber. Returns the id of the composite to use as the provider's processor.
+     *
+     * @param array<array-key, mixed> $config
+     */
+    private function buildConsoleOutputLogging(
+        array $config,
+        string $providerServiceId,
+        string $exportProcessorServiceId,
+        Reference $errorHandlerRef,
+        ContainerBuilder $builder,
+    ): string {
+        /** @var array<string, string> $verbosityLevels */
+        $verbosityLevels = is_array($config['verbosity_levels'] ?? null) ? $config['verbosity_levels'] : [];
+        $levelsDefinition = new Definition(
+            ConsoleVerbosityLevels::class,
+            [ConsoleVerbosityLevels::fromOverrides($verbosityLevels)->thresholds()],
+        );
+
+        $consoleProcessorId = $providerServiceId . '.console_output.processor';
+        $builder->setDefinition(
+            $consoleProcessorId,
+            new Definition(ConsoleOutputLogProcessor::class, [$levelsDefinition]),
+        );
+
+        $subscriberDefinition = new Definition(ConsoleLogOutputSubscriber::class, [new Reference($consoleProcessorId)]);
+        $subscriberDefinition->addTag('kernel.event_subscriber');
+        $builder->setDefinition($providerServiceId . '.console_output.subscriber', $subscriberDefinition);
+
+        $compositeId = $exportProcessorServiceId . '.with_console_output';
+        $compositeDefinition = new Definition(CompositeLogProcessor::class);
+        $compositeDefinition->setArgument(0, [new Reference($exportProcessorServiceId), new Reference($consoleProcessorId)]);
+        $compositeDefinition->setArgument(1, $errorHandlerRef);
+        $builder->setDefinition($compositeId, $compositeDefinition);
+
+        return $compositeId;
     }
 
     /**
@@ -2524,7 +2607,7 @@ final class FlowTelemetryBundle extends AbstractBundle
     }
 
     /**
-     * @param array{http_kernel?: array{enabled?: bool, exclude_routes?: array<string>, exclude_paths?: array<array{path: string, method?: null|string}>, context_propagation?: bool}, console?: array{enabled?: bool, exclude_commands?: array<string>}, messenger?: array{enabled?: bool, context_propagation?: bool}, twig?: array{enabled?: bool, trace_templates?: bool, trace_blocks?: bool, trace_macros?: bool, exclude_templates?: array<string>}, http_client?: array{enabled?: bool, exclude_clients?: array<string>}, psr18_client?: array{enabled?: bool, exclude_clients?: array<string>}, dbal?: array{enabled?: bool, log_sql?: bool, max_sql_length?: int, exclude_connections?: array<string>}, cache?: array{enabled?: bool, exclude_pools?: array<string>}} $config
+     * @param array{http_kernel?: array{enabled?: bool, exclude_routes?: array<string>, exclude_paths?: array<array{path: string, method?: null|string}>, context_propagation?: bool}, console?: array{enabled?: bool, exclude_commands?: array<string>}, messenger?: array{enabled?: bool, context_propagation?: bool, propagation_style?: 'continue'|'link'}, twig?: array{enabled?: bool, trace_templates?: bool, trace_blocks?: bool, trace_macros?: bool, exclude_templates?: array<string>}, http_client?: array{enabled?: bool, exclude_clients?: array<string>}, psr18_client?: array{enabled?: bool, exclude_clients?: array<string>}, dbal?: array{enabled?: bool, log_sql?: bool, max_sql_length?: int, exclude_connections?: array<string>}, cache?: array{enabled?: bool, exclude_pools?: array<string>}} $config
      */
     private function registerInstrumentation(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
@@ -2537,7 +2620,7 @@ final class FlowTelemetryBundle extends AbstractBundle
             );
             $builder->setParameter(
                 'flow.telemetry.http_kernel.context_propagation',
-                $httpKernelConfig['context_propagation'] ?? true,
+                ($httpKernelConfig['context_propagation'] ?? true) && class_exists(self::HTTP_FOUNDATION_REQUEST_CARRIER),
             );
             $container->import(__DIR__ . '/Resources/config/instrumentation/http_kernel.php');
         }
@@ -2567,6 +2650,7 @@ final class FlowTelemetryBundle extends AbstractBundle
                 $definition = $builder->getDefinition('flow.telemetry.messenger.middleware');
                 $definition->setArgument(1, new Reference('flow.telemetry.context_storage'));
                 $definition->setArgument(2, new Reference('flow.telemetry.propagator'));
+                $definition->setArgument(3, MessengerTracePropagation::from($messengerConfig['propagation_style'] ?? 'link'));
             }
         }
 
@@ -2882,7 +2966,7 @@ final class FlowTelemetryBundle extends AbstractBundle
     }
 
     /**
-     * @param array{http_kernel?: array{enabled?: bool, exclude_routes?: array<string>, exclude_paths?: array<array{path: string, method?: null|string}>, context_propagation?: bool}, console?: array{enabled?: bool, exclude_commands?: array<string>}, messenger?: array{enabled?: bool, context_propagation?: bool}, twig?: array{enabled?: bool, trace_templates?: bool, trace_blocks?: bool, trace_macros?: bool, exclude_templates?: array<string>}, http_client?: array{enabled?: bool, exclude_clients?: array<string>}, psr18_client?: array{enabled?: bool, exclude_clients?: array<string>}, dbal?: array{enabled?: bool, log_sql?: bool, max_sql_length?: int, exclude_connections?: array<string>}, cache?: array{enabled?: bool, exclude_pools?: array<string>}} $config
+     * @param array{http_kernel?: array{enabled?: bool, exclude_routes?: array<string>, exclude_paths?: array<array{path: string, method?: null|string}>, context_propagation?: bool}, console?: array{enabled?: bool, exclude_commands?: array<string>}, messenger?: array{enabled?: bool, context_propagation?: bool, propagation_style?: 'continue'|'link'}, twig?: array{enabled?: bool, trace_templates?: bool, trace_blocks?: bool, trace_macros?: bool, exclude_templates?: array<string>}, http_client?: array{enabled?: bool, exclude_clients?: array<string>}, psr18_client?: array{enabled?: bool, exclude_clients?: array<string>}, dbal?: array{enabled?: bool, log_sql?: bool, max_sql_length?: int, exclude_connections?: array<string>}, cache?: array{enabled?: bool, exclude_pools?: array<string>}} $config
      */
     private function registerParameterOnlyInstrumentation(array $config, ContainerBuilder $builder): void
     {

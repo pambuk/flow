@@ -7,6 +7,57 @@ Please follow the instructions for your specific version to ensure a smooth upgr
 
 ---
 
+## [Unreleased]
+
+### 1) Removal of Elasticsearch Adapter
+
+The Elasticsearch adapter has been removed from Flow PHP and replaced by the [SEAL](https://php-cmsig.github.io/search/)
+adapter (`flow-php/etl-adapter-seal`), a search engine abstraction layer that supports Elasticsearch, OpenSearch,
+Meilisearch, Solr, Typesense, Algolia, RediSearch and Loupe.
+
+To migrate, install the SEAL adapter together with the engine adapter for your backend:
+
+```
+composer require flow-php/etl-adapter-seal cmsig/seal-elasticsearch-adapter
+```
+
+Then build a `CmsIg\Seal\Engine` and pass it to `to_seal_upsert()` instead of the previous `to_es_bulk_index()` (or
+Meilisearch) DSL functions:
+
+```php
+use CmsIg\Seal\Engine;
+use CmsIg\Seal\Adapter\Elasticsearch\ElasticsearchAdapter;
+
+use function Flow\ETL\Adapter\Seal\to_seal_upsert;
+
+$engine = new Engine(
+    new ElasticsearchAdapter($client),
+    $schema,
+);
+
+data_frame()
+    ->read(/* ... */)
+    ->write(to_seal_upsert($engine, 'index_name'))
+    ->run();
+```
+
+### 2) `flow-php/symfony-telemetry-bundle` -
+
+`flow-php/symfony-http-foundation-telemetry-bridge` is now an optional dependency
+
+| Before                               | After                                                       |
+|--------------------------------------|-------------------------------------------------------------|
+| installed transitively by the bundle | install explicitly to enable HTTP trace context propagation |
+
+`instrumentation.http_kernel.context_propagation` is silently disabled when the bridge is absent. To keep extracting
+incoming and injecting outgoing W3C trace headers:
+
+```
+composer require flow-php/symfony-http-foundation-telemetry-bridge
+```
+
+---
+
 ## Upgrading from 0.39.x to 0.40.x
 
 ### 1) `flow-php/postgresql` - column and domain defaults are modeled as `ColumnDefault`
